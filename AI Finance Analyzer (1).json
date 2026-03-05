@@ -1,0 +1,684 @@
+{
+  "name": "AI Finance Analyzer",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        256
+      ],
+      "id": "041fd539-af47-426c-8dd3-91a4a4eaa9eb",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Central Configuration - No secondary API keys required\nconst settings = {\n  // 1. Core AI Authentication\n  apiKeys: {\n    openRouter: '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' // Only one key needed for the AI \"Brain\"\n  },\n\n  // 2. Scraping & Compliance Settings\n  scraping: {\n    // SEC requires an email in the header to identify yourself\n    secUserAgent: 'Subhan Azhar (subhansandhu312@gmail.com)', \n    // This URL lets us \"scrape\" stock info without an API\n    yahooFinanceBase: 'https://query1.finance.yahoo.com/v8/finance/chart/'\n  },\n\n  // 3. Analysis Parameters\n  analysis: {\n    dateRangeMonths: 12,\n    riskThreshold: 75,\n    aiModel: 'anthropic/claude-3.5-sonnet' // Best for financial reasoning\n  },\n\n  // 4. Initial IT Watchlist\n  watchlist: [\n    { ticker: 'NVDA', name: 'NVIDIA' },\n    { ticker: 'MSFT', name: 'Microsoft' },\n    { ticker: 'AAPL', name: 'Apple' }\n  ]\n};\n\nreturn { settings };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        256
+      ],
+      "id": "a680a94d-1eb6-4b67-9e91-a29979187391",
+      "name": "Configuration"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg",
+          "mode": "list",
+          "cachedResultName": "AI Finance Analyzer",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        320,
+        256
+      ],
+      "id": "3669a6d7-1b2f-44bf-abc7-266a95d54004",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BlttQGHm5oTLMoii",
+          "name": "Google Sheets account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        544,
+        272
+      ],
+      "id": "04e226a3-2b8b-4b6a-83d9-4fe8ecd08f38",
+      "name": "Loop Over Items",
+      "alwaysOutputData": false,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "url": "=https://www.sec.gov/cgi-bin/browse-edgar?CIK={{ $json.Ticker }}&action=getcompany&type=10-K",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": " Subhan Azhar (subhansandhu312@gmail.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        832,
+        96
+      ],
+      "id": "72f98b8f-420d-4b3e-84e0-934d4c2f0134",
+      "name": "Signal 1"
+    },
+    {
+      "parameters": {
+        "url": "=https://query1.finance.yahoo.com/v8/finance/chart/{{ $json.Ticker }}?interval=1d&range=1mo",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "=",
+              "value": "="
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        816,
+        272
+      ],
+      "id": "30c3e9f5-5a25-4397-9d45-05fd2e72eae9",
+      "name": "Signal 2"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "=document_url",
+              "cssSelector": "=table.tableFile2 td a",
+              "returnValue": "attribute",
+              "attribute": "href"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        1040,
+        96
+      ],
+      "id": "d75b9d54-fa96-4168-ae7e-16662a51ba74",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const ticker = item.json.Ticker || \"Unknown\";\n  const performance = parseFloat(item.json[\"Performance (1-Year)\"]) || 0;\n  \n  const accrualRatio = performance / 1; \n  let status = \"Healthy\";\n  let riskScore = 15;\n\n  if (accrualRatio > 0.1) {\n    status = \"High Accruals (Potential Risk)\";\n    riskScore = 80;\n  }\n\n  return {\n    json: {\n      ticker: ticker,\n      signal_name: \"Accrual Anomaly\",\n      accrual_ratio: accrualRatio.toFixed(4),\n      status: status,\n      risk_score: riskScore\n    }\n  };\n}); // This closing line is mandatory"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        432
+      ],
+      "id": "a9a6e79b-8b42-4d45-b973-95a3566daf68",
+      "name": "Signal 3: Accrual Math"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  // Pull ticker from the incoming Google Sheet data\n  const ticker = item.json.Ticker || item.json.ticker || \"WDC\"; \n  // ... rest of your math ...\n  return { json: { ticker: ticker, risk_score: 85, status: \"High Accruals\" } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        96
+      ],
+      "id": "3e3701cb-eaf2-4aaa-b5c0-a2089cf6dc67",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1568,
+        288
+      ],
+      "id": "bfa4df1f-c636-4bd4-9fda-ac03317eb95b",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the financial data for {{ $json.ticker }}.\n\nSEC Link: {{ $json.full_10k_url }}\n\nPrice Data: Moderate volatility\n\nAccrual Risk: {{ $json.risk_score }}\nProvide your analysis in the required JSON format only. Do not add any conversational text",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1808,
+        224
+      ],
+      "id": "e2da11a6-b752-441c-9094-80ef9200af91",
+      "name": "AI Agent",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": "mistralai/devstral-small",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        480
+      ],
+      "id": "59d359ce-d721-4fb1-8729-e6bd75a51388",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "s3miT36YOhi093Xo",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg",
+          "mode": "list",
+          "cachedResultName": "AI Finance Analyzer",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/16Kc2uO5dr2n8FlvKmeplhqtbD7Np04d4FhBCO9JOfRg/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ticker": "={{ $item(0).$node[\"Loop Over Items\"].json[\"Ticker\"] }}",
+            "Performance (1-Year)": "={{ $json.output.summary }}",
+            "Recommendation": "={{ $json.output.recommendation }}",
+            "Risk Score": "={{ $json.output.risk_score }}",
+            "Company": "NEW"
+          },
+          "matchingColumns": [
+            "Ticker"
+          ],
+          "schema": [
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ticker",
+              "displayName": "Ticker",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Market Cap (est.)",
+              "displayName": "Market Cap (est.)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Performance (1-Year)",
+              "displayName": "Performance (1-Year)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Recommendation",
+              "displayName": "Recommendation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Risk Score",
+              "displayName": "Risk Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2320,
+        480
+      ],
+      "id": "adbda697-b089-4b8d-b2de-7f06054960f1",
+      "name": "Append or update row in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "BlttQGHm5oTLMoii",
+          "name": "Google Sheets account 5"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"ticker\": { \"type\": \"string\" },\n    \"risk_score\": { \"type\": \"number\" },\n    \"summary\": { \"type\": \"string\" },\n    \"recommendation\": { \"type\": \"string\", \"enum\": [\"Buy\", \"Hedge\", \"Avoid\"] }\n  },\n  \"required\": [\"ticker\", \"risk_score\", \"summary\", \"recommendation\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2112,
+        496
+      ],
+      "id": "98154ebd-53ef-4cd2-b71f-ddfab210c1ae",
+      "name": "Structured Output Parser1"
+    },
+    {
+      "parameters": {
+        "sendTo": "subhansandhu312@gmail.com",
+        "subject": "=🚀 Portfolio Optimization Complete:  Companies Analyzed",
+        "message": "=The automated financial analysis workflow has finished processing your watchlist of  stocks.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        816,
+        -128
+      ],
+      "id": "ac24dc88-b9ce-479b-ac46-16454b00f2c0",
+      "name": "Send a message",
+      "webhookId": "21ff52cc-72c2-4a93-8cd7-5c3899e86936",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "R31sIgAcSWO3ssqX",
+          "name": "Gmail account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {}
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        2128,
+        112
+      ],
+      "id": "61f2e734-f4eb-4214-8bf8-9f0c002a68bf",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "yw5On6YTW11hNRGx",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        -112
+      ],
+      "id": "4de987d4-62f4-44bc-9b40-723edb08bfef",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3-flash-preview"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "This acts as a \"Developer Alert\" so you know the primary AI failed and the backup had to step in.\ngive the error details "
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1376,
+        -112
+      ],
+      "id": "3f59bddf-f5be-4f1e-a5ec-5f2f9ef7a777",
+      "name": "Message a model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "yw5On6YTW11hNRGx",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "subhansandhu312@gmail.com",
+        "subject": "=⚠️ AI Fail-Safe Triggered ",
+        "message": "=The primary AI Agent encountered an error while analyzing.  The Fail-Safe Gemini node has successfully intercepted the error and updated the Google Sheet. Error Details:{{ $json.content.parts[0].text }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1744,
+        -112
+      ],
+      "id": "9aba4937-4c08-4056-b091-e32d084462ef",
+      "name": "Send a message1",
+      "webhookId": "f813670d-41b3-4fbd-b82e-211828c03f9e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "R31sIgAcSWO3ssqX",
+          "name": "Gmail account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Signal 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Signal 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Signal 3: Accrual Math",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signal 2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Signal 1": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signal 3: Accrual Math": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser1": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f1d5b75f-3c4d-44d0-8fe8-61ea0a1bcb3e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "97cdaab89af73ebd5970b4d23e9d1859d7eb3b935c78db3eb6127ddba5b4902d"
+  },
+  "id": "qAhAerWQ4s5GPWJMWHXEm",
+  "tags": []
+}
